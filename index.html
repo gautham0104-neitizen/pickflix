@@ -58,6 +58,58 @@
                 #0a0a0f;
     overflow: hidden;
 }
+#revealOverlay {
+    position: fixed;
+    inset: 0;
+    background: black;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+
+#revealOverlay.show {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+#revealPoster {
+    width: 260px;
+    border-radius: 16px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.8);
+
+    opacity: 0;
+    transform: scale(1.3);
+    filter: blur(10px);
+
+    transition: 
+        transform 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+        opacity 0.5s ease,
+        filter 0.5s ease;
+}
+#revealOverlay.show {
+    animation: bgPulse 1.2s ease-in-out;
+}
+
+@keyframes bgPulse {
+    0% { background: #000; }
+    50% { background: #0a0a15; }
+    100% { background: #000; }
+}
+#revealOverlay.show #revealPoster {
+    opacity: 1;
+    transform: scale(1);
+    filter: blur(0);
+}
+/* final animation state */
+#revealOverlay.animate #revealPoster {
+    transform: scale(0.4) translate(220px, 120px);
+    opacity: 0;
+    filter: blur(2px);
+}
 
 .bg-animation::after {
     content: "";
@@ -180,6 +232,7 @@
 
         /* Main container */
         .container {
+            margin-top: 20px;
             max-width: 1120px;
             margin: 0 auto;
             padding: 2rem 1.5rem 3rem;
@@ -1162,7 +1215,17 @@
             }
 
             header {
-                padding: 1rem;
+               
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+   
+    backdrop-filter: blur(16px) saturate(1.2);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+
+    background: transparent;
             }
 
             .hero {
@@ -1229,29 +1292,38 @@ body::after {
 }
 #trailerPopup {
     position: fixed;
-    bottom: 20px;
-    right: 20px;
-    width: 360px;
-    height: 200px;
-    background: #000;
-    border-radius: var(--radius-md);
-    overflow: hidden;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    box-shadow:
-        0 0 0 1px rgba(0, 0, 0, 0.5) inset,
-        0 24px 56px rgba(0, 0, 0, 0.75),
-        0 0 40px rgba(99, 102, 241, 0.15);
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
     opacity: 0;
     pointer-events: none;
-    transform: scale(0.94) translateY(8px);
-    transition: opacity 0.35s var(--ease-out), transform 0.35s var(--ease-out), box-shadow 0.35s;
+    transition: opacity 0.3s ease;
+
     z-index: 999;
 }
 
 #trailerPopup.show {
     opacity: 1;
     pointer-events: auto;
-    transform: scale(1) translateY(0);
+}
+
+#trailerContainer {
+    width: min(900px, 90vw);
+    aspect-ratio: 16/9;
+
+    background: black;
+    border-radius: 16px;
+    overflow: hidden;
+
+    transform: scale(0.9);
+    transition: transform 0.3s ease;
+}
+
+#trailerPopup.show #trailerContainer {
+    transform: scale(1);
 }
 
 #trailerFrame {
@@ -1261,6 +1333,12 @@ body::after {
     </style>
 </head>
 <body>
+    <header>
+    <div class="logo">
+        <div class="logo-icon">🎬</div>
+        Pickflix
+    </div>
+</header>
     <div id="backdrop"></div>
     <div class="bg-animation"></div>
 
@@ -1666,7 +1744,7 @@ body::after {
             trailerTimeout = setTimeout(() => {
                 trailerTimeout = null;
                 loadTrailerForHover(movieId, seq);
-            }, 500);
+            }, 900);
         }
 
         function hideTrailer() {
@@ -1786,9 +1864,16 @@ activeChips.forEach(chip => {
 
                 if (movie) {
                     currentMovie = movie;
-                    displayMovie(movie);
+                    const posterUrl = movie.poster_path 
+    ? TMDB_IMG_BASE + movie.poster_path 
+    : null;
 
-                    addToRecentIds(movie.id);
+if (posterUrl) {
+    await cinematicReveal(posterUrl);
+}
+
+displayMovie(movie);
+addToRecentIds(movie.id);
                 } else {
                     showToast('No movies found with current filters. Try adjusting them!', 'error');
                 }
@@ -1797,7 +1882,15 @@ activeChips.forEach(chip => {
                 // Fall back to sample data
                 const movie = getRandomSampleMovie();
                 currentMovie = movie;
-                displayMovie(movie);
+               const posterUrl = movie.poster_path 
+    ? TMDB_IMG_BASE + movie.poster_path 
+    : null;
+
+if (posterUrl) {
+    await cinematicReveal(posterUrl);
+}
+
+displayMovie(movie);
  
             }
 
@@ -1848,6 +1941,29 @@ activeChips.forEach(chip => {
     fullMovie.cast = castData.cast.slice(0, 4).map(c => c.name);
 
     return fullMovie;
+}
+function cinematicReveal(posterPath) {
+    return new Promise((resolve) => {
+        const overlay = document.getElementById("revealOverlay");
+        const img = document.getElementById("revealPoster");
+
+        img.src = posterPath;
+
+        // show overlay
+        overlay.classList.add("show");
+
+        // small delay before animation
+        // wait so user actually sees the poster
+setTimeout(() => {
+    overlay.classList.add("animate");
+}, 650); // ⬅️ increased delay
+
+        // after animation ends
+        setTimeout(() => {
+    overlay.classList.remove("show", "animate");
+    resolve();
+}, 1100); // ⬅️ longer total time
+    });
 }
 
         // Get random sample movie
@@ -2052,10 +2168,13 @@ if (movie.backdrop_path) {
     window.open(url, "_blank");
 }
     </script>
-    <div id="trailerPopup">
-    <iframe id="trailerFrame" title="Movie trailer" frameborder="0" allowfullscreen
-        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-        referrerpolicy="strict-origin-when-cross-origin"></iframe>
+    <div id="trailerPopup" onclick="hideTrailer()">
+    <div id="trailerContainer" onclick="event.stopPropagation()">
+        <iframe id="trailerFrame" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+    </div>
+</div>
+<div id="revealOverlay">
+    <img id="revealPoster" />
 </div>
 </body>
 </html>
